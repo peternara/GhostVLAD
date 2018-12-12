@@ -1,0 +1,44 @@
+import tensorflow as tf
+import tensorlayer as tl
+
+
+def GhostVLAD_pooling(inputs,k_centers,scope): #K_centers the k value you choose
+
+    num_features = inputs.get_shape()[3].value
+
+    with tf.variable_scope(scope) as sc:
+
+        c = tf.get_variable('centers',shape=[1,1,k_centers,num_features],initializer=tf.contrib.layers.xavier_initializer())
+
+        cluster_weight=tf.layers.conv2d(inputs, k_centers+1, [1, 1], strides=[1, 1], padding='valid')
+
+        a = tf.nn.softmax(cluster_weight)
+
+        a=tf.reshape(a,[-1,4,k_centers+1,1]) #Here is the fusion of the four features so the second dimension of reshape is 4
+
+        a,_ = tf.split(a, [8, 1], 2) # shape=(?, 4, 8, 1)
+        inputs=tf.reshape(inputs,[-1,4,num_features])
+        v = tf.tile(tf.expand_dims(inputs, -2),[1,1,k_centers,1]) - c
+        outputs=a*v  #shape=(?, 4, 8, 512)
+
+        outputs= tf.reduce_sum(outputs, axis=1)
+
+        outputs = tl.layers.InputLayer(outputs, name='vlda_output_layer') # shape=(?, 8, 512)
+
+        outputs=tl.layers.ReshapeLayer(outputs,shape=[-1,8*256],name='vlda_reshape')
+
+        outputs=tl.layers.DenseLayer(outputs, n_units=128, W_init=tf.contrib.layers.xavier_initializer(uniform=False), name='vlda_DenseLayer')
+
+        #outputs = BatchNormLayer(outputs, act=tf.identity, is_train=True, trainable=trainable, name='caps_block')
+
+        return outputs
+
+
+
+
+
+
+
+
+
+
